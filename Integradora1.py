@@ -94,7 +94,6 @@ class robotAgent(Agent):
     def step(self):
         self.move()
 
-
 class CuartoModel(Model):
     """A model with some number of agents."""
 
@@ -107,7 +106,7 @@ class CuartoModel(Model):
         self.schedule = RandomActivation(self)
         self.datacollector = DataCollector(
             model_reporters={
-                "AgentPositions": self.get_agent_positions,
+                "AgentPositions": lambda m: [agent.pos for agent in m.schedule.agents],
                 "CajaPositions": self.get_caja_positions,
                 "Pasos": lambda m: m.pasos,
                 "CajasAcomodadas": lambda m: m.cajasAcomodadas  # Recolectar datos de cajas acomodadas
@@ -146,13 +145,7 @@ class CuartoModel(Model):
 
     def get_caja_positions(self):
         """Devuelve un diccionario con las posiciones de las celdas ocupadas y la cantidad de cajas en cada una."""
-        caja_positions = {}
-        for x in range(self.grid.width):
-            for y in range(self.grid.height):
-                cantidad_caja = self.celdas_ocupadas[x, y]
-                if cantidad_caja > 0:
-                    caja_positions[(x, y)] = cantidad_caja
-        return caja_positions
+        return self.celdas_ocupadas
 
     def mover_agentes_abajo(self):
         """Mueve todos los agentes un paso hacia abajo."""
@@ -218,13 +211,11 @@ for step in range(num_steps):
     grid = np.zeros((model.grid.width, model.grid.height), dtype=int)
 
     # Marcar número de basuras en cada celda
-    for pos, cantidad in celdas_ocupadas.items():
-        x, y = pos
-        grid[x][y] = cantidad  # Incrementar el número de basuras en la celda
-
-    center_x, center_y = model.grid.width // 2, model.grid.height // 2
-    # Guardar la grid con el número de basuras y posiciones de agentes
+    for x in range(model.grid.width):
+        for y in range(model.grid.height):
+            grid[x][y] = celdas_ocupadas[x, y]  # Copiar el número de basuras en la celda
     grids.append((grid, agent_positions))
+
 
 # --- Update function for animation ---
 def update(frame):
@@ -240,7 +231,7 @@ def update(frame):
             ax.text(j, i, f'{val}', ha='center', va='center', color='black')
 
     # Añadir los agentes
-    for pos in agent_positions.values():
+    for pos in agent_positions:
         x, y = pos
         circle = patches.Circle((y, x), radius=0.3, facecolor='green', edgecolor='black', linewidth=1)
         ax.add_patch(circle)
@@ -256,7 +247,5 @@ grid, _ = grids[0]  # Initialize with the first grid state
 
 # --- Create the animation ---
 ani = animation.FuncAnimation(fig, update, frames=num_steps, interval=100, repeat=False)
-ani.save("robots_animation_notOP.gif", writer="imagemagick", fps=10)
-
 # --- Show the animation ---
 plt.show()
