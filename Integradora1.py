@@ -256,6 +256,7 @@ grid, _ = grids[0]  # Initialize with the first grid state
 
 # --- Create the animation ---
 ani = animation.FuncAnimation(fig, update, frames=num_steps, interval=100, repeat=False)
+ani.save("robots_animation_notOP.gif", writer="imagemagick", fps=10)
 
 # --- Show the animation ---
 plt.show()
