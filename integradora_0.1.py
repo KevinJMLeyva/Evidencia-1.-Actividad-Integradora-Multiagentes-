@@ -66,6 +66,7 @@ class robotAgent(Agent):
                 cell_agents = self.model.grid.get_cell_list_contents([closest_step])
                 if len(cell_agents) == 0:  # Si no hay agentes, moverse
                     self.model.grid.move_agent(self, closest_step)
+                    self.steps +=1
         else:
             # Moverse a una celda vacía en el vecindario
             caja_pos=self.encontrar_coordenada_caja_cercana(self.pos)
@@ -86,6 +87,7 @@ class robotAgent(Agent):
                             self.cargandoCaja += 1
                 closest_step = min(possible_steps, key=lambda x: self.distance(x,  caja_pos))
                 self.model.grid.move_agent(self, closest_step)
+                self.steps +=1
             else:
                 if(self.pos==center_pos):
                     print('Estoy encerrado en el centro, voy a hacer que todos se muevan para liberarme')
@@ -99,21 +101,19 @@ class robotAgent(Agent):
     def encontrar_coordenada_caja_cercana(self, pos):
         """Encuentra la coordenada de la caja más cercana a la posición dada."""
         caja_positions = self.model.get_caja_positions()
-        if not caja_positions:
+        if not np.any(caja_positions):
             return None  # No hay cajas en el modelo  
         
         closest_pos = None
         min_dist = float('inf')
         
-        for caja_pos in caja_positions.keys():
-            dist = self.distance(pos, caja_pos)
-            valor1, valor2 = caja_pos
-            valor_espacio=self.model.celdas_ocupadas[valor1][valor2]
-            valor_espacio= int(valor_espacio)
-            if (valor_espacio==1):
-                if dist < min_dist:  # Verificar que la celda tiene exactamente 1 caja
-                    min_dist = dist
-                    closest_pos = caja_pos            
+        caja_positions = np.argwhere(caja_positions == 1)
+        for coord in caja_positions:
+            x, y = coord  # Desempaquetar la coordenada en x e y
+            dist = self.distance(pos, (x, y))
+            if dist < min_dist:
+                min_dist = dist
+                closest_pos = (x, y)         
                     
         # Check if a valid closest_pos was found
         if closest_pos is None:
@@ -144,7 +144,7 @@ class CuartoModel(Model):
         self.schedule = RandomActivation(self)
         self.datacollector = DataCollector(
             model_reporters={
-                "AgentPositions": self.get_agent_positions,
+                "AgentPositions": lambda m: [agent.pos for agent in m.schedule.agents],
                 "CajaPositions": self.get_caja_positions,
                 "Pasos": lambda m: m.pasos,
                 "CajasAcomodadas": lambda m: m.cajasAcomodadas  # Recolectar datos de cajas acomodadas
@@ -174,22 +174,10 @@ class CuartoModel(Model):
             y = self.random.randrange(self.grid.height)
             self.grid.place_agent(a, (x, y))
 
-    def get_agent_positions(self):
-        positions = {}
-        for agent in self.schedule.agents:
-            if isinstance(agent, robotAgent):
-                positions[agent.unique_id] = agent.pos
-        return positions
 
     def get_caja_positions(self):
         """Devuelve un diccionario con las posiciones de las celdas ocupadas y la cantidad de cajas en cada una."""
-        caja_positions = {}
-        for x in range(self.grid.width):
-            for y in range(self.grid.height):
-                cantidad_caja = self.celdas_ocupadas[x, y]
-                if cantidad_caja > 0:
-                    caja_positions[(x, y)] = cantidad_caja
-        return caja_positions
+        return self.celdas_ocupadas
 
     def mover_agentes_abajo(self):
         """Mueve todos los agentes un paso hacia abajo."""
@@ -203,6 +191,7 @@ class CuartoModel(Model):
                     # Mueve el agente a la nueva posición si está disponible
                     if self.grid.is_cell_empty(new_pos):
                         self.grid.move_agent(agent, new_pos)
+                        agent.steps +=1
 
     def depositar_caja(self, cantidad):
         """Método para depositar las cajas en la coordenada definida."""
@@ -255,12 +244,9 @@ for step in range(num_steps):
     grid = np.zeros((model.grid.width, model.grid.height), dtype=int)
 
     # Marcar número de basuras en cada celda
-    for pos, cantidad in celdas_ocupadas.items():
-        x, y = pos
-        grid[x][y] = cantidad  # Incrementar el número de basuras en la celda
-
-    center_x, center_y = model.grid.width // 2, model.grid.height // 2
-    # Guardar la grid con el número de basuras y posiciones de agentes
+    for x in range(model.grid.width):
+        for y in range(model.grid.height):
+            grid[x][y] = celdas_ocupadas[x, y]  # Copiar el número de basuras en la celda
     grids.append((grid, agent_positions))
 
 # --- Update function for animation ---
@@ -271,13 +257,13 @@ def update(frame):
     # Dibujar la grid
     mat = ax.matshow(grid, cmap='YlOrBr', origin='lower')
 
-    # Añadir el número de basuras en las celdas
+     # Añadir el número de basuras en las celdas
     for (i, j), val in np.ndenumerate(grid):
         if val > 0:
             ax.text(j, i, f'{val}', ha='center', va='center', color='black')
 
     # Añadir los agentes
-    for pos in agent_positions.values():
+    for pos in agent_positions:
         x, y = pos
         circle = patches.Circle((y, x), radius=0.3, facecolor='green', edgecolor='black', linewidth=1)
         ax.add_patch(circle)
@@ -293,7 +279,6 @@ grid, _ = grids[0]  # Initialize with the first grid state
 
 # --- Create the animation ---
 ani = animation.FuncAnimation(fig, update, frames=num_steps, interval=100, repeat=False)
-ani.save("robots_animation_OP.gif", writer="imagemagick", fps=10)
-
 # --- Show the animation ---
 plt.show()
+
