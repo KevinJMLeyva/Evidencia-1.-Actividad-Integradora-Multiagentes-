@@ -8,7 +8,7 @@ Para dar soluci√≥n a este problema se desarrollaron dos algoritmos de recolecci√
 
 Simulacion no eficiente
 
-![Alt Text](./robots_animation_notOP.gif)
+![Alt Text](./robot_animation_notOP.gif)
 
 Simulacion eficente
 
